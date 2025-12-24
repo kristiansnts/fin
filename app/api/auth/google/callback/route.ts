@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { exchangeCodeForTokens } from "@/lib/google/oauth";
+import { sendWhatsAppReply } from "@/lib/whatsapp/message-handler";
 import { NextRequest, NextResponse } from "next/server";
 import { ulid } from "ulid";
 
@@ -66,7 +67,14 @@ export async function GET(req: NextRequest) {
             where: { id: state },
         });
 
-        // 6. Redirect to a success page
+        // 6. Notify user via WhatsApp
+        await sendWhatsAppReply(
+            authState.whatsappId,
+            "✅ Success! Your Google account has been connected. You can now use Google Calendar features.",
+            "default"
+        );
+
+        // 7. Redirect to a success page
         return new NextResponse(`
             <html>
                 <body style="font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f0f2f5;">
