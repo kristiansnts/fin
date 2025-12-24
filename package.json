@@ -1,15 +1,15 @@
 {
-  "name": "langchain-nextjs",
-  "description": "A getting started guide for building LangChain agents with Next.js",
-  "author": "Christian Bromann <mail@bromann.dev>",
+  "name": "fin",
+  "description": "fin: your personal assistant",
+  "author": "Kristian Epa Froditus Santoso",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/christian-bromann/langchat"
+    "url": "https://github.com/kristiansnts/fin"
   },
-  "homepage": "https://github.com/christian-bromann/langchat",
+  "homepage": "https://github.com/kristiansnts/fin",
   "bugs": {
-    "url": "https://github.com/christian-bromann/langchat/issues"
+    "url": "https://github.com/kristiansnts/fin/issues"
   },
   "type": "module",
   "version": "0.1.0",
@@ -18,13 +18,16 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "generate:waha": "tsx scripts/generate-waha-client.ts"
   },
   "dependencies": {
     "@langchain/anthropic": "^0.3.33",
     "@langchain/core": "^1.0.3",
     "@langchain/langgraph": "^1.0.1",
+    "@langchain/langgraph-checkpoint-postgres": "^1.0.0",
     "@langchain/langgraph-sdk": "^1.0.0",
+    "@langchain/openai": "^1.2.0",
     "langchain": "^1.0.3",
     "next": "16.0.1",
     "next-themes": "^0.4.6",
