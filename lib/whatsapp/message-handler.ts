@@ -36,6 +36,12 @@ export async function sendWhatsAppReply(
     text: string,
     session: string = "default"
 ): Promise<void> {
+    // Safety check: Never send to status broadcast (story upload)
+    if (to === 'status@broadcast') {
+        console.warn("🛡️ Blocked attempt to send message to status@broadcast");
+        return;
+    }
+
     const client = getWahaClient();
 
     await client.sendText({
@@ -43,6 +49,80 @@ export async function sendWhatsAppReply(
         chatId: to,
         text,
     });
+}
+
+/**
+ * Mark a chat as seen
+ */
+export async function markAsSeen(
+    chatId: string,
+    session: string = "default"
+): Promise<void> {
+    const client = getWahaClient();
+    try {
+        await client.sendSeen({
+            session,
+            chatId,
+        });
+    } catch (error) {
+        console.error("Failed to mark as seen:", error);
+    }
+}
+
+/**
+ * Start typing indicators
+ */
+export async function startTyping(
+    chatId: string,
+    session: string = "default"
+): Promise<void> {
+    const client = getWahaClient();
+    try {
+        await client.startTyping({
+            session,
+            chatId,
+        });
+    } catch (error) {
+        console.error("Failed to start typing:", error);
+    }
+}
+
+/**
+ * Stop typing indicators
+ */
+export async function stopTyping(
+    chatId: string,
+    session: string = "default"
+): Promise<void> {
+    const client = getWahaClient();
+    try {
+        await client.stopTyping({
+            session,
+            chatId,
+        });
+    } catch (error) {
+        console.error("Failed to stop typing:", error);
+    }
+}
+
+/**
+ * Set presence for the session
+ */
+export async function setPresence(
+    presence: "offline" | "online" | "typing" | "recording" | "paused",
+    chatId?: string,
+    session: string = "default"
+): Promise<void> {
+    const client = getWahaClient();
+    try {
+        await client.setPresence({
+            session,
+            chatId,
+            presence,
+        });
+    } catch (error) {
+        console.error(`Failed to set presence to ${presence}:`, error);
+    }
 }
 
 /**
