@@ -6,7 +6,8 @@ import {
     WebhookSkippedResponse,
     WebhookErrorResponse
 } from "./types";
-import { extractMessage, processWhatsAppMessage } from "@/lib/whatsapp/message-handler";
+import { extractMessage, processWhatsAppMessage, sendWhatsAppReply } from "@/lib/whatsapp/message-handler";
+import { createAuthDeepLink } from "@/lib/google";
 
 export async function POST(req: NextRequest): Promise<NextResponse<WebhookResponse>> {
     try {
@@ -28,7 +29,8 @@ export async function POST(req: NextRequest): Promise<NextResponse<WebhookRespon
         console.log(`📩 Message from ${message.from} on session ${message.session}: ${message.text}`);
 
         // Process the message (this is where you can integrate with your agent)
-        await processWhatsAppMessage(message);
+        const authUrl = await createAuthDeepLink(message.from);
+        await sendWhatsAppReply(message.from, `Please connect your Google account: ${authUrl}`, 'default')
 
         const response: WebhookSuccessResponse = {
             success: true,
