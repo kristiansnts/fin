@@ -6,8 +6,8 @@ import {
     WebhookSkippedResponse,
     WebhookErrorResponse
 } from "./types";
-import { extractMessage, processWhatsAppMessage, sendWhatsAppReply } from "@/lib/whatsapp/message-handler";
-import { createAuthDeepLink } from "@/lib/google";
+import { extractMessage, sendWhatsAppReply, markAsSeen, startTyping, stopTyping, setPresence } from "@/lib/whatsapp/message-handler";
+import { processWhatsAppWithAgent } from "../agent";
 
 export async function POST(req: NextRequest): Promise<NextResponse<WebhookResponse>> {
     try {
@@ -26,11 +26,38 @@ export async function POST(req: NextRequest): Promise<NextResponse<WebhookRespon
             return NextResponse.json(response);
         }
 
+        // Ignore status updates and group messages (if intended to be personal agent)
+        if (message.from === 'status@broadcast' || message.from.includes('@g.us')) {
+            console.log(`⏭️ Skipping non-personal message from ${message.from}`);
+            return NextResponse.json({
+                success: true,
+                skipped: true,
+                reason: "Not a personal message"
+            });
+        }
+
         console.log(`📩 Message from ${message.from} on session ${message.session}: ${message.text}`);
 
-        // Process the message (this is where you can integrate with your agent)
-        const authUrl = await createAuthDeepLink(message.from);
-        await sendWhatsAppReply(message.from, `Please connect your Google account: ${authUrl}`, 'default')
+        const session = message.session || 'default';
+
+        // 1. Mark as seen
+        await markAsSeen(message.from, session);
+
+        // 2. Start typing & set presence typing
+        await startTyping(message.from, session);
+        await setPresence("typing", message.from, session);
+
+        // 3. Process the message with the agent
+        const agentResponse = await processWhatsAppWithAgent(message.from, message.text);
+
+        // 4. Stop typing
+        await stopTyping(message.from, session);
+
+        // 5. Send the agent's response back to WhatsApp
+        await sendWhatsAppReply(message.from, String(agentResponse), session);
+
+        // 6. Set presence online
+        await setPresence("online", undefined, session);
 
         const response: WebhookSuccessResponse = {
             success: true,

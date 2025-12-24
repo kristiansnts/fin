@@ -499,6 +499,12 @@ export interface ChatRequest {
     session: string;
 }
 
+export interface PresenceRequest {
+    chatId?: string;
+    presence: "offline" | "online" | "typing" | "recording" | "paused";
+    session: string;
+}
+
 export interface MessageReactionRequest {
     messageId: string;
     /** Emoji to react with. Send an empty string to remove the reaction */
@@ -1712,7 +1718,8 @@ export class WahaClient {
             throw new Error(`WAHA API Error: ${error}`);
         }
 
-        return response.json();
+        const text = await response.text();
+        return text ? JSON.parse(text) : ({} as T);
     }
 
     /**
@@ -1783,6 +1790,13 @@ export class WahaClient {
      */
     async stopTyping(data: ChatRequest): Promise<any> {
         return this.request<any>('/api/stopTyping', 'POST', data);
+    }
+
+    /**
+     * setPresence
+     */
+    async setPresence(data: PresenceRequest): Promise<any> {
+        return this.request<any>(`/api/${data.session}/presence`, 'POST', data);
     }
 
     /**

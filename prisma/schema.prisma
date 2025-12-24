@@ -47,36 +47,36 @@ model checkpoints {
 }
 
 model User {
-  id          String         @id
-  whatsappId  String         @unique
-  createdAt   DateTime       @default(now())
+  id            String         @id
+  whatsappId    String         @unique
+  createdAt     DateTime       @default(now())
+  messageLogs   MessageLog[]
   oauthAccounts OAuthAccount[]
-  messageLogs  MessageLog[]
 }
 
 model OAuthAccount {
   id           String   @id
   userId       String
-  user         User     @relation(fields: [userId], references: [id])
   accessToken  String
   refreshToken String
   expiresAt    DateTime
   scope        String
+  user         User     @relation(fields: [userId], references: [id])
 }
 
 model MessageLog {
   id        String   @id
   userId    String?
-  user      User?    @relation(fields: [userId], references: [id])
   message   String
   response  String
   createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id])
 }
 
 model AuthState {
-  id         String   @id 
+  id         String   @id
   whatsappId String   @unique
-  longUrl    String   @db.Text
+  longUrl    String
   createdAt  DateTime @default(now())
   expiresAt  DateTime
 }

@@ -38,3 +38,5 @@ export { CalendarApiClient } from './client';
 export { CalendarService } from './service';
 export * from './types';
 export * from './calendar-utils';
+export * from './service-factory';
+export * from './tools';
