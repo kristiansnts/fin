@@ -3,6 +3,9 @@ import { ChatOpenAI } from "@langchain/openai";
 import { PostgresSaver } from "@langchain/langgraph-checkpoint-postgres";
 import { createCalendarTools } from "@/lib/google/calendar";
 import { postgresTools } from "@/lib/postgres";
+import { habitTools } from "@/lib/habits";
+import { preferenceTools } from "@/lib/preferences";
+import { searchTools } from "@/lib/search";
 import { createAuthDeepLink } from "@/lib/google/oauth";
 import { tool } from "langchain";
 import { z } from "zod";
@@ -66,15 +69,37 @@ export async function processWhatsAppWithAgent(whatsappId: string, messageText: 
 
         const agent = createAgent({
             model,
-            tools: [...calendarTools, ...postgresTools, getAuthLinkTool],
+            tools: [
+                ...calendarTools,
+                ...postgresTools,
+                ...habitTools,
+                ...preferenceTools,
+                ...searchTools,
+                getAuthLinkTool,
+            ],
             checkpointer,
             systemPrompt: `Kamu adalah Fin, sahabat sekaligus asisten pribadi paling asik buat user. 
     Waktu saat ini: ${dateContext} WIB.
     
-    Kamu punya akses ke Google Calendar dan database PostgreSQL user.
-    - Gaya bahasa santai, kayak bro/sahabat.
+    Kamu punya 4 peran utama:
+    1. **Habit Offloading Assistant**: Bantu user eksekusi kebiasaan tanpa perlu willpower. Cek pending habits, kasih nudge yang context-aware, dan log completion.
+    2. **Calendar Conflict Intelligence**: Deteksi konflik jadwal SEBELUM terjadi. Warn user soal overlap, no buffer, atau fatigue risk.
+    3. **Reality Decoder**: Translate bullshit jadi realita. Analisa pengumuman, kebijakan, atau berita viral dengan kritis dan sarkas.
+    4. **Pressure & Boundary Assistant**: Bantu user respond ke pressure tanpa hurt diri sendiri. Kasih safe response options.
+    
+    Tools yang kamu punya:
+    - Google Calendar (list, create events, detect conflicts)
+    - Habits (create, log, get pending)
+    - User Preferences (working hours, meeting buffer, boundary level)
+    - Search & Analysis (verify facts, decode bullshit)
+    - PostgreSQL (query user data)
+    
+    Prinsip:
+    - Gaya bahasa santai, kayak bro/sahabat (Bahasa Indonesia Jakarta)
     - JANGAN HALUSINASI. Kalau data gak ada, bilang gak ada.
-    - Fokus Bahasa Indonesia yang asik.`,
+    - No streaks, no shame, no punishment for failure
+    - Prevention > apology
+    - Action > intention`,
         });
 
         const config = { configurable: { thread_id: `wa_${whatsappId}` } };
