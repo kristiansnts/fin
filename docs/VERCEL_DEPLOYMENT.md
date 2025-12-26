@@ -84,6 +84,14 @@ This ensures the Prisma Client is always available during builds.
 This means Prisma Client wasn't generated. The build scripts should handle this automatically, but if you encounter this:
 - Ensure `DATABASE_URL` is set in your environment
 - Check that the build logs show "Generated Prisma Client"
+- Ensure `dotenv` is installed as a dev dependency (required for Prisma 7)
+
+### Missing dotenv Error
+If you see errors about `dotenv/config` not found:
+```bash
+pnpm add -D dotenv
+```
+This is required for Prisma 7's `prisma.config.ts` to load environment variables.
 
 ### WAHA Connection Issues
 - Ensure `WAHA_API_URL` is accessible from Vercel's servers
