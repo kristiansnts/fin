@@ -26,13 +26,17 @@ export async function POST(req: NextRequest): Promise<NextResponse<WebhookRespon
             return NextResponse.json(response);
         }
 
-        // Ignore status updates and group messages (if intended to be personal agent)
-        if (message.from === 'status@broadcast' || message.from.includes('@g.us')) {
-            console.log(`⏭️ Skipping non-personal message from ${message.from}`);
+        // Ignore status updates, group messages (if intended to be personal agent), and LID messages
+        if (
+            message.from === 'status@broadcast' ||
+            message.from.includes('@g.us') ||
+            message.from.includes('@lid')
+        ) {
+            console.log(`⏭️ Skipping non-personal or LID message from ${message.from}`);
             return NextResponse.json({
                 success: true,
                 skipped: true,
-                reason: "Not a personal message"
+                reason: "Not a personal message or is a Linked Device ID"
             });
         }
 
