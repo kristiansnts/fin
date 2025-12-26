@@ -6,9 +6,9 @@ import { PostgresSaver } from "@langchain/langgraph-checkpoint-postgres";
 
 type DB_URI = string | undefined;
 
-const DB_URI: DB_URI = process.env.NEXT_PUBLIC_DB_URI;
+const DB_URI: DB_URI = process.env.DATABASE_URL;
 if (!DB_URI) {
-  throw new Error("Missing NEXT_PUBLIC_DB_URI");
+  throw new Error("Missing DATABASE_URL");
 }
 
 const checkpointer = PostgresSaver.fromConnString(DB_URI);

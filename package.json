@@ -16,10 +16,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
-    "generate:waha": "tsx scripts/generate-waha-client.ts"
+    "generate:waha": "tsx scripts/generate-waha-client.ts",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@langchain/anthropic": "^0.3.33",
@@ -47,6 +48,7 @@
     "@types/pg": "^8.16.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.2.3",
     "eslint": "^9",
     "eslint-config-next": "16.0.1",
     "prisma": "^7.2.0",
