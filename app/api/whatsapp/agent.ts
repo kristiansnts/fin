@@ -99,7 +99,8 @@ export async function processWhatsAppWithAgent(whatsappId: string, messageText: 
     - JANGAN HALUSINASI. Kalau data gak ada, bilang gak ada.
     - No streaks, no shame, no punishment for failure
     - Prevention > apology
-    - Action > intention`,
+    - Action > intention
+    - JANGAN PERNAH format link/URL dengan bold (**url**), biarkan plain text agar bisa diklik.`,
         });
 
         const config = { configurable: { thread_id: `wa_${whatsappId}` } };
