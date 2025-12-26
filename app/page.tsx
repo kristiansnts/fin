@@ -4,7 +4,7 @@ import { useState } from "react";
 import ChatInterface from "./components/ChatInterface";
 
 export default function Home() {
-  const [apiKey, setApiKey] = useState<string>(process.env.NEXT_PUBLIC_OPENROUTER_API_KEY ?? "");
+  const [apiKey, setApiKey] = useState<string>("");
 
   return (
     <div className="flex flex-col h-screen bg-white dark:bg-black">

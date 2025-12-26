@@ -8,12 +8,12 @@ let wahaClientInstance: WahaClient | null = null;
  */
 export function getWahaClient(): WahaClient {
     if (!wahaClientInstance) {
-        const baseUrl = process.env.NEXT_PUBLIC_WAHA_API_URL;
-        const apiKey = process.env.NEXT_PUBLIC_WAHA_API_KEY;
+        const baseUrl = process.env.WAHA_API_URL;
+        const apiKey = process.env.WAHA_API_KEY;
 
         if (!baseUrl || !apiKey) {
             throw new Error(
-                'WAHA configuration missing: NEXT_PUBLIC_WAHA_API_URL and NEXT_PUBLIC_WAHA_API_KEY must be set'
+                'WAHA configuration missing: WAHA_API_URL and WAHA_API_KEY must be set'
             );
         }
 
