@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getCalendarServiceForUser } from "@/lib/google/calendar/service-factory";
 import { habitService } from "@/lib/habits/service";
 import { sendWhatsAppReply } from "@/lib/whatsapp/message-handler";
+import { MICRO_HABITS } from "@/lib/habits/data/micro-habits";
 
 /**
  * MORNING BRIEFING
@@ -62,6 +63,16 @@ export async function runMorningBriefing() {
             const message = `${intro}\n\n${scheduleAnalysis}${habitNudge}`;
 
             await sendWhatsAppReply(user.whatsappId, message);
+
+            await prisma.messageLog.create({
+                data: {
+                    id: crypto.randomUUID(),
+                    userId: user.id,
+                    message: "[CRON_MORNING_BRIEFING]",
+                    response: message,
+                }
+            });
+
             results.push({ userId: user.id, status: 'sent' });
 
         } catch (error) {
@@ -79,7 +90,7 @@ export async function runMorningBriefing() {
 export async function runNudge() {
     console.log("[Cron] Starting nudge check...");
     const users = await prisma.user.findMany({
-        where: { habits: { some: {} } }
+        where: {} // Check all users
     });
 
     const results = [];
@@ -88,11 +99,8 @@ export async function runNudge() {
 
     for (const user of users) {
         try {
+            const allHabits = await habitService.getUserHabits(user.id);
             const pendingHabits = await habitService.getPendingHabits(user.id);
-            if (pendingHabits.length === 0) {
-                results.push({ userId: user.id, status: 'skipped', reason: 'no_pending' });
-                continue;
-            }
 
             const calendarService = await getCalendarServiceForUser(user.whatsappId);
             let isFree = true;
@@ -101,10 +109,47 @@ export async function runNudge() {
             }
 
             if (!isFree) {
+                console.log(`[Cron] User ${user.whatsappId} is busy. Skipping Nudge.`);
                 results.push({ userId: user.id, status: 'skipped', reason: 'busy' });
                 continue;
             }
 
+            // Scenario 1: No Habits at all -> Suggest Micro-Habit
+            // Scenario 1: No Habits at all -> Suggest Micro-Habit
+            if (allHabits.length === 0) {
+                const suggestion = MICRO_HABITS[Math.floor(Math.random() * MICRO_HABITS.length)];
+
+                const message = `Keliatan kamu lagi ada jeda sebentar.
+
+Yang paling ringan: ${suggestion.action}
+
+Buat ${suggestion.impact}`;
+
+                await sendWhatsAppReply(user.whatsappId, message);
+
+                // Log to DB so Agent can recall it later if needed
+                await prisma.messageLog.create({
+                    data: {
+                        id: crypto.randomUUID(),
+                        userId: user.id,
+                        message: "[CRON_NUDGE_ZERO_HABIT]",
+                        response: message,
+                    }
+                });
+
+                console.log(`[Cron] Sent zero-habit suggestion to ${user.whatsappId}`);
+                results.push({ userId: user.id, status: 'sent', type: 'zero_habit_suggestion' });
+                continue;
+            }
+
+            // Scenario 2: Has habits but all done -> Relax
+            if (pendingHabits.length === 0) {
+                console.log(`[Cron] User ${user.whatsappId} has 0 pending habits. Skipping Nudge.`);
+                results.push({ userId: user.id, status: 'skipped', reason: 'no_pending' });
+                continue;
+            }
+
+            // Scenario 3: Has pending habits -> Nudge
             const habitToNudge = pendingHabits[Math.floor(Math.random() * pendingHabits.length)];
             const message = `👀 Mumpung ada waktu kosong 30 menit.
 
@@ -113,6 +158,17 @@ Kalo lagi mood, boleh nih nyicil "${habitToNudge.title}" bentar. 5 menit cukup, 
 Kalo lagi pengen istirahat, skip aja santai bro. 👌`;
 
             await sendWhatsAppReply(user.whatsappId, message);
+
+            await prisma.messageLog.create({
+                data: {
+                    id: crypto.randomUUID(),
+                    userId: user.id,
+                    message: `[CRON_NUDGE_HABIT:${habitToNudge.title}]`,
+                    response: message,
+                }
+            });
+
+            console.log(`[Cron] Sent nudge to ${user.whatsappId} for habit ${habitToNudge.title}`);
             results.push({ userId: user.id, status: 'sent', habit: habitToNudge.title });
 
         } catch (error) {
@@ -177,6 +233,16 @@ export async function runEveningSummary() {
             const message = `${summary}\n\nSekarang waktunya disconnect. Sampai ketemu besok pagi! 👋`;
 
             await sendWhatsAppReply(user.whatsappId, message);
+
+            await prisma.messageLog.create({
+                data: {
+                    id: crypto.randomUUID(),
+                    userId: user.id,
+                    message: "[CRON_EVENING_SUMMARY]",
+                    response: message,
+                }
+            });
+
             results.push({ userId: user.id, status: 'sent' });
 
         } catch (error) {

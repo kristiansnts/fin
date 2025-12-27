@@ -6,6 +6,7 @@ import { postgresTools } from "@/lib/postgres";
 import { habitTools } from "@/lib/habits";
 import { preferenceTools } from "@/lib/preferences";
 import { searchTools } from "@/lib/search";
+import { messageLogTools } from "@/lib/message-logs/tools";
 import { createAuthDeepLink } from "@/lib/google/oauth";
 import { tool } from "langchain";
 import { z } from "zod";
@@ -75,6 +76,7 @@ export async function processWhatsAppWithAgent(whatsappId: string, messageText: 
                 ...habitTools,
                 ...preferenceTools,
                 ...searchTools,
+                ...messageLogTools,
                 getAuthLinkTool,
             ],
             checkpointer,
@@ -95,10 +97,17 @@ export async function processWhatsAppWithAgent(whatsappId: string, messageText: 
     - User Preferences (working hours, meeting buffer, boundary level)
     - Search & Analysis (verify facts, decode bullshit)
     - PostgreSQL (query user data)
+    - **Recent System Messages** (cek pesan terakhir yang DIKIRIM OLEH SYSTEM/CRON ke user)
     
     Prinsip:
     - Gaya bahasa santai, kayak bro/sahabat (Bahasa Indonesia Jakarta)
-    - JANGAN HALUSINASI. Kalau data gak ada, bilang gak ada.
+    - **ANTI-HALLUCINATION**: Jika user bilang "Done", "Udah", atau "Siap", tapi kamu lupa konteksnya, **WAJIB CEK** 'get_recent_system_messages' dulu. 
+      - Cari pesan terakhir dari system (biasanya Nudge Habit atau Morning Briefing).
+      - **CRITICAL**: Jika pesan terakhir adalah "Micro Habit" (e.g. minum air), dan user bilang "Done":
+        - Buatkan event di Google Calendar: Title: "[Habit] Minum Air", Durasi: 15 menit, Waktu: Sekarang.
+        - Response HANYA: "Mantap! Udah gw catet di kalender biar keliatan progress-nya. 💪"
+        - **JANGAN SEBUTKAN EVENT LAIN** yang ada di kalender user (seperti Ibadah, Meeting, dll). Event-event itu cuma buat Evening Summary.
+      - Kalau pesan bukan micro habit, tanya balik konteksnya.
     - **Philosophy**: Cognitive Load Reducer. Absorbs discipline, don't enforce it.
     - **Habits**: Offer "micro-habits" (opsi 5-10 menit) daripada task besar yang bikin malas. No shame user kalau skip.
     - **Scheduling**: Guide user jadi scheduler yang lebih baik. Warn conflicts, offer solusi (reschedule/delay).
