@@ -62,10 +62,10 @@ The FIN agent now has access to:
 ## 🚀 What's Next (Phase 3 & 4)
 
 ### Phase 3: Proactive Infrastructure (The "Nudge" Engine)
-- [ ] Create `app/api/cron/nudge/route.ts` for proactive messaging
-- [ ] Implement hourly cron job (Vercel Cron)
-- [ ] Logic to check pending habits + free calendar slots
-- [ ] Send WhatsApp messages via WAHA when conditions are met
+- [x] Create `app/api/cron/nudge/route.ts` for proactive messaging
+- [x] Implement hourly cron job (Vercel Cron)
+- [x] Logic to check pending habits + free calendar slots
+- [x] Send WhatsApp messages via WAHA when conditions are met
 
 ### Phase 4: Specialized Agent Prompts
 - [ ] Create `lib/prompts/habit-agent.ts`
