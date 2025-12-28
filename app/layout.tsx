@@ -18,6 +18,9 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://fin.ssadmin.my.id'),
   title: "Fin AI",
   description: "Your personal AI assistant powered by advanced language models. Organize your life with intelligent conversations.",
+  verification: {
+    google: 'KayLBO2VZobON1WzNacX5Pyz9i5C3ZQDdGzF7UyuiuQ',
+  },
 };
 
 export default function RootLayout({
