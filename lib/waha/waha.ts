@@ -1726,7 +1726,9 @@ export class WahaClient {
      * Send a text message
      */
     async sendText(data: MessageTextRequest): Promise<WAMessage> {
-        return this.request<WAMessage>('/api/sendText', 'POST', data);
+        // Map 'text' to 'body' as per WAHA 
+        const payload = { ...data, body: data.text };
+        return this.request<WAMessage>('/api/sendText', 'POST', payload);
     }
 
     /**
@@ -1796,7 +1798,7 @@ export class WahaClient {
      * setPresence
      */
     async setPresence(data: PresenceRequest): Promise<any> {
-        return this.request<any>(`/api/${data.session}/presence`, 'POST', data);
+        return this.request<any>('/api/setPresence', 'POST', data);
     }
 
     /**
