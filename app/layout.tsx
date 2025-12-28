@@ -15,6 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://fin.ssadmin.my.id'),
   title: "Fin AI",
   description: "Your personal AI assistant powered by advanced language models. Organize your life with intelligent conversations.",
 };

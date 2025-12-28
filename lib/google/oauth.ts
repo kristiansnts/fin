@@ -164,6 +164,6 @@ export async function createAuthDeepLink(whatsappId: string): Promise<string> {
         }
     });
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://fin.ssadmin.my.id';
     return `${baseUrl}/auth/g/${id}`;
 }
