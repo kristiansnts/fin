@@ -20,3 +20,9 @@ for the MVP phase.
 - Session persistence
 
 See each document for detailed specifications.
+
+tagline:
+Fin itu AI yang bantu kamu hidup waras di dunia yang ribet.
+
+Most assistants help you do more.
+FIN helps you regret less.

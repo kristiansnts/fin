@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LangChain Agent Demo",
-  description: "A simple demo app showcasing LangChain's createAgent with Next.js",
+  title: "Fin AI",
+  description: "Your personal AI assistant powered by advanced language models. Organize your life with intelligent conversations.",
 };
 
 export default function RootLayout({

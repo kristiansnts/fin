@@ -104,8 +104,26 @@ export async function runNudge() {
 
             const calendarService = await getCalendarServiceForUser(user.whatsappId);
             let isFree = true;
+            let hasEventsToday = false;
+            let nextEvent = undefined;
+
             if (calendarService) {
                 isFree = await calendarService.isTimeFree(now, thirtyMinutesFromNow);
+                try {
+                    const todayEvents = await calendarService.getTodayEvents();
+                    hasEventsToday = todayEvents.length > 0;
+                    const upcoming = todayEvents.find(e =>
+                        e.start?.dateTime && new Date(e.start.dateTime).getTime() > now.getTime()
+                    );
+                    if (upcoming && upcoming.start?.dateTime) {
+                        nextEvent = {
+                            summary: upcoming.summary || "Event",
+                            time: new Date(upcoming.start.dateTime).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })
+                        };
+                    }
+                } catch (e) {
+                    console.error("Error fetching calendar context for nudge:", e);
+                }
             }
 
             if (!isFree) {
@@ -114,48 +132,17 @@ export async function runNudge() {
                 continue;
             }
 
-            // Scenario 1: No Habits at all -> Suggest Micro-Habit
-            // Scenario 1: No Habits at all -> Suggest Micro-Habit
-            if (allHabits.length === 0) {
-                const suggestion = MICRO_HABITS[Math.floor(Math.random() * MICRO_HABITS.length)];
+            // Call the Habit Agent (with Calendar Context injected)
+            const { generateNudge } = await import("@/lib/agent/nudge-agent");
 
-                const message = `Keliatan kamu lagi ada jeda sebentar.
-
-Yang paling ringan: ${suggestion.action}
-
-Buat ${suggestion.impact}`;
-
-                await sendWhatsAppReply(user.whatsappId, message);
-
-                // Log to DB so Agent can recall it later if needed
-                await prisma.messageLog.create({
-                    data: {
-                        id: crypto.randomUUID(),
-                        userId: user.id,
-                        message: "[CRON_NUDGE_ZERO_HABIT]",
-                        response: message,
-                    }
-                });
-
-                console.log(`[Cron] Sent zero-habit suggestion to ${user.whatsappId}`);
-                results.push({ userId: user.id, status: 'sent', type: 'zero_habit_suggestion' });
-                continue;
-            }
-
-            // Scenario 2: Has habits but all done -> Relax
-            if (pendingHabits.length === 0) {
-                console.log(`[Cron] User ${user.whatsappId} has 0 pending habits. Skipping Nudge.`);
-                results.push({ userId: user.id, status: 'skipped', reason: 'no_pending' });
-                continue;
-            }
-
-            // Scenario 3: Has pending habits -> Nudge
-            const habitToNudge = pendingHabits[Math.floor(Math.random() * pendingHabits.length)];
-            const message = `👀 Mumpung ada waktu kosong 30 menit.
-
-Kalo lagi mood, boleh nih nyicil "${habitToNudge.title}" bentar. 5 menit cukup, gak usah perfect.
-
-Kalo lagi pengen istirahat, skip aja santai bro. 👌`;
+            const message = await generateNudge({
+                whatsappId: user.whatsappId,
+                isFree,
+                minutesAvailable: 30, // Assumed for nudge slot
+                pendingHabits: pendingHabits.map(h => ({ title: h.title, id: h.id })),
+                hasEventsToday,
+                nextEvent
+            });
 
             await sendWhatsAppReply(user.whatsappId, message);
 
@@ -163,13 +150,13 @@ Kalo lagi pengen istirahat, skip aja santai bro. 👌`;
                 data: {
                     id: crypto.randomUUID(),
                     userId: user.id,
-                    message: `[CRON_NUDGE_HABIT:${habitToNudge.title}]`,
+                    message: `[CRON_NUDGE_AGENT]`,
                     response: message,
                 }
             });
 
-            console.log(`[Cron] Sent nudge to ${user.whatsappId} for habit ${habitToNudge.title}`);
-            results.push({ userId: user.id, status: 'sent', habit: habitToNudge.title });
+            console.log(`[Cron] Sent AI nudge to ${user.whatsappId}`);
+            results.push({ userId: user.id, status: 'sent', method: 'ai_agent' });
 
         } catch (error) {
             console.error(`[Cron] Error nudge user ${user.id}:`, error);
