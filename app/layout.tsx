@@ -1,3 +1,4 @@
+import { Analytics } from "@vercel/analytics/next";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -14,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LangChain Agent Demo",
-  description: "A simple demo app showcasing LangChain's createAgent with Next.js",
+  title: "Fin AI",
+  description: "Your personal AI assistant powered by advanced language models. Organize your life with intelligent conversations.",
 };
 
 export default function RootLayout({
@@ -31,6 +32,7 @@ export default function RootLayout({
       >
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
           {children}
+          <Analytics />
         </ThemeProvider>
       </body>
     </html>
