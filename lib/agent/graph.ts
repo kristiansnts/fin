@@ -1,7 +1,10 @@
 
-import { BaseMessage, HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { BaseMessage, HumanMessage, SystemMessage, AIMessage, ToolMessage } from "@langchain/core/messages";
 import { StateGraph, Annotation, START, END, MessagesAnnotation } from "@langchain/langgraph";
 import { ChatOpenAI } from "@langchain/openai";
+import { createAuthDeepLink } from "@/lib/google/oauth";
+import { tool } from "@langchain/core/tools";
+import { z } from "zod";
 
 // --- State Definition ---
 const AgentState = Annotation.Root({
@@ -24,7 +27,7 @@ const getModel = () => new ChatOpenAI({
 async function supervisorNode(state: typeof AgentState.State) {
     const model = getModel();
     const systemPrompt = `You are Fin's Supervisor. Route the user's message to the correct worker:
-- **Organizer**: scheduling, calendar, habits, tasks, reminders
+- **Organizer**: scheduling, calendar, habits, tasks, reminders, "connect google", "auth"
 - **Listener**: chat, emotional support, analysis, general questions
 
 Reply with ONLY "organizer" or "listener".`;
@@ -46,25 +49,78 @@ async function organizerNode(state: typeof AgentState.State, config: any) {
     const model = getModel();
     const whatsappId = config.configurable?.thread_id?.replace('wa_', '') || 'unknown';
 
+    // Create auth link tool
+    const getAuthLinkTool = tool(
+        async () => {
+            const link = await createAuthDeepLink(whatsappId);
+            return link;
+        },
+        {
+            name: "get_google_auth_link",
+            description: "Generate a Google OAuth authentication link when user needs to connect their Google Calendar. Call this if user mentions calendar, scheduling, or asks to connect Google.",
+            schema: z.object({}),
+        }
+    );
+
+    const tools = [getAuthLinkTool];
+    const modelWithTools = model.bindTools(tools);
+
     const systemPrompt = `You are Fin (Organizer Mode). 
 Focus: Scheduling, Habits, Productivity.
-Style: Casual "bro/bestie" Indonesian (Jakarta slang). Be helpful and efficient.
+Style: Polite, calm, and gentle like a professional head maid/butler. Speak in formal Indonesian with respectful tone.
 
 Current time: ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB
 
-IMPORTANT: Since you don't have access to tools right now, if the user asks about:
-- Calendar/scheduling: Tell them you'll help them set it up and ask for the auth link
-- Habits: Acknowledge and encourage them
-- General productivity: Give advice
+TOOLS AVAILABLE:
+- get_google_auth_link: Use this when user needs to connect Google Calendar
 
-Keep responses SHORT (2-3 sentences max).`;
+If user asks about calendar/scheduling and hasn't connected yet, call get_google_auth_link and share the link.
+Address the user respectfully. Keep responses SHORT (2-3 sentences max).`;
 
-    const response = await model.invoke([
+    const response = await modelWithTools.invoke([
         new SystemMessage(systemPrompt),
         ...state.messages
     ]);
 
-    console.log(`[Organizer] Response generated`);
+    // Check if there are tool calls
+    if (response.tool_calls && response.tool_calls.length > 0) {
+        console.log(`[Organizer] Tool calls detected: ${response.tool_calls.length}`);
+
+        // Execute tools
+        const toolMessages: BaseMessage[] = [];
+        for (const toolCall of response.tool_calls) {
+            try {
+                const foundTool = tools.find(t => t.name === toolCall.name);
+                if (foundTool) {
+                    const result = await foundTool.invoke(toolCall);
+                    toolMessages.push(new ToolMessage({
+                        content: String(result),
+                        tool_call_id: toolCall.id!,
+                        name: toolCall.name
+                    }));
+                }
+            } catch (error: any) {
+                toolMessages.push(new ToolMessage({
+                    content: `Error: ${error.message}`,
+                    tool_call_id: toolCall.id!,
+                    name: toolCall.name
+                }));
+            }
+        }
+
+        // Get final response after tool execution
+        const finalResponse = await modelWithTools.invoke([
+            new SystemMessage(systemPrompt),
+            ...state.messages,
+            response,
+            ...toolMessages
+        ]);
+
+        console.log(`[Organizer] Final response generated after tool execution`);
+        return { messages: [response, ...toolMessages, finalResponse], next: "end" };
+    }
+
+    console.log(`[Organizer] Direct response (no tools)`);
     return { messages: [response], next: "end" };
 }
 
@@ -74,9 +130,9 @@ async function listenerNode(state: typeof AgentState.State) {
 
     const systemPrompt = `You are Fin (Listener Mode). 
 Focus: Chat, Emotional Support, Analysis, General Questions.
-Style: Empathetic, casual "bro/bestie" Indonesian (Jakarta slang). Be supportive and real.
+Style: Empathetic, calm, and gentle like a caring head maid/butler. Speak in formal Indonesian with warm, respectful tone.
 
-Be conversational and helpful. If they're venting, listen and validate.
+Be attentive and understanding. If they're venting, listen with compassion and validate their feelings.
 Keep responses SHORT (2-3 sentences max).`;
 
     const response = await model.invoke([
@@ -108,3 +164,4 @@ export function createFinGraph() {
 
     return workflow;
 }
+
