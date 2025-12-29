@@ -1798,7 +1798,7 @@ export class WahaClient {
      * setPresence
      */
     async setPresence(data: PresenceRequest): Promise<any> {
-        return this.request<any>('/api/setPresence', 'POST', data);
+        return this.request<any>(`/api/${data.session}/presence`, 'POST', data);
     }
 
     /**
