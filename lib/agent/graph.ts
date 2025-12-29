@@ -109,11 +109,23 @@ Address the user respectfully. Keep responses SHORT (2-3 sentences max).`;
         }
 
         // Get final response after tool execution
+        // Extract the actual link from tool messages
+        const linkResults = toolMessages
+            .filter(msg => msg instanceof ToolMessage)
+            .map(msg => (msg as ToolMessage).content)
+            .join('\n');
+
+        const finalSystemPrompt = `${systemPrompt}
+
+IMPORTANT: You just received tool results. The authentication link is:
+${linkResults}
+
+Now respond to the user with this link. DO NOT say "[object ToolMessage]". 
+Use the actual URL shown above. Format it nicely in your response.`;
+
         const finalResponse = await modelWithTools.invoke([
-            new SystemMessage(systemPrompt),
+            new SystemMessage(finalSystemPrompt),
             ...state.messages,
-            response,
-            ...toolMessages
         ]);
 
         console.log(`[Organizer] Final response generated after tool execution`);
