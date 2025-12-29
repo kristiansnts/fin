@@ -19,7 +19,7 @@ async function testWebhook() {
         payload: {
             id: `test_msg_${Date.now()}`,
             from: testPhoneNumber,
-            body: "Help me schedule a meeting with team tomorrow at 9am",
+            body: "Fin, tolong kirim link login Google Calendar",
             _data: { Info: { Sender: testPhoneNumber, Chat: testPhoneNumber, PushName: "TestUser" } }
         },
         timestamp: Date.now() / 1000
