@@ -1,26 +1,14 @@
 
-import { AIMessage, BaseMessage, HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { StateGraph, Annotation, START, END } from "@langchain/langgraph";
+import { BaseMessage, HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { StateGraph, Annotation, START, END, MessagesAnnotation } from "@langchain/langgraph";
 import { ChatOpenAI } from "@langchain/openai";
 
-import { z } from "zod";
-import { createCalendarTools } from "@/lib/google/calendar";
-import { habitTools } from "@/lib/habits";
-import { postgresTools } from "@/lib/postgres";
-import { preferenceTools } from "@/lib/preferences";
-import { searchTools } from "@/lib/search";
-import { messageLogTools } from "@/lib/message-logs/tools";
-import { createAuthDeepLink } from "@/lib/google/oauth";
-import { tool } from "@langchain/core/tools";
-
 // --- State Definition ---
-export const AgentState = Annotation.Root({
-    messages: Annotation<BaseMessage[]>({
-        reducer: (x, y) => x.concat(y),
-    }),
+const AgentState = Annotation.Root({
+    ...MessagesAnnotation.spec,
     next: Annotation<string>({
-        reducer: (x, y) => y ?? x ?? END,
-        default: () => END,
+        reducer: (x, y) => y ?? x ?? "end",
+        default: () => "end",
     }),
 });
 
@@ -32,131 +20,91 @@ const getModel = () => new ChatOpenAI({
     temperature: 0.7,
 });
 
-// --- Node: Supervisor (Router) ---
-const supervisorPrompt = `You are Fin, the "Supervisor" of a personal agent system. 
-Your goal is to route the user's message to the correct worker agent based on their intent.
-
-Available Workers:
-1. **Organizer**: Handles scheduling, calendar, habits, and productivity tasks.
-2. **Listener**: Handles emotional support, chatting, analysis, journaling, and general queries.
-
-Logic:
-- If the user talks about time, schedule, calendar, habits, tasks, or "remind me" -> Route to **Organizer**.
-- If the user wants to chat, vent, ask for analysis, or general knowledge -> Route to **Listener**.
-- If unclear, default to **Listener**.
-
-Output EXACTLY one of: "Organizer", "Listener".`;
-
+// --- Supervisor Node ---
 async function supervisorNode(state: typeof AgentState.State) {
     const model = getModel();
-    // A simple classification chain
+    const systemPrompt = `You are Fin's Supervisor. Route the user's message to the correct worker:
+- **Organizer**: scheduling, calendar, habits, tasks, reminders
+- **Listener**: chat, emotional support, analysis, general questions
+
+Reply with ONLY "organizer" or "listener".`;
+
     const response = await model.invoke([
-        new SystemMessage(supervisorPrompt),
+        new SystemMessage(systemPrompt),
         ...state.messages,
     ]);
 
-    const content = response.content as string;
-    let next = "Listener"; // Default
-    if (content.toLowerCase().includes("organizer")) next = "Organizer";
-    if (content.toLowerCase().includes("listener")) next = "Listener";
+    const content = (response.content as string).toLowerCase();
+    const next = content.includes("organizer") ? "organizer" : "listener";
 
+    console.log(`[Supervisor] Routing to: ${next}`);
     return { next };
 }
 
-// --- Node: Organizer ---
+// --- Organizer Node ---
 async function organizerNode(state: typeof AgentState.State, config: any) {
     const model = getModel();
     const whatsappId = config.configurable?.thread_id?.replace('wa_', '') || 'unknown';
 
-    // Tools specific to Organizer
-    const calendarTools = await createCalendarTools(whatsappId);
-    const getAuthLinkTool = tool(
-        async () => {
-            const link = await createAuthDeepLink(whatsappId);
-            return `Please connect your Google account: ${link}`;
-        },
-        {
-            name: "get_google_auth_link",
-            description: "Generate a Google OAuth link.",
-            schema: z.object({}),
-        }
-    );
+    const systemPrompt = `You are Fin (Organizer Mode). 
+Focus: Scheduling, Habits, Productivity.
+Style: Casual "bro/bestie" Indonesian (Jakarta slang). Be helpful and efficient.
 
-    const tools = [
-        ...calendarTools,
-        ...habitTools,
-        getAuthLinkTool
-    ];
+Current time: ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB
 
-    const modelWithTools = model.bindTools(tools);
+IMPORTANT: Since you don't have access to tools right now, if the user asks about:
+- Calendar/scheduling: Tell them you'll help them set it up and ask for the auth link
+- Habits: Acknowledge and encourage them
+- General productivity: Give advice
 
-    const systemPrompt = `You are Fin (Organizer Mode).
-    Focus: Scheduling, Habits, Productivity.
-    Tools: Calendar, Habits.
-    Style: Efficient, "Bro/Bestie", Helpful.
-    
-    If you need to create an event or habit, DO IT.
-    If the user has not connected Google Calendar and you need it, call 'get_google_auth_link'.
-    Using 'checkpointer' logic: If you perform an action, Confirm it.`;
+Keep responses SHORT (2-3 sentences max).`;
 
-    const response = await modelWithTools.invoke([
+    const response = await model.invoke([
         new SystemMessage(systemPrompt),
         ...state.messages
     ]);
 
-    return { messages: [response] };
+    console.log(`[Organizer] Response generated`);
+    return { messages: [response], next: "end" };
 }
 
-// --- Node: Listener ---
+// --- Listener Node ---
 async function listenerNode(state: typeof AgentState.State) {
     const model = getModel();
 
-    // Tools specific to Listener (ReadOnly DB, Search, Memory)
-    const tools = [
-        ...searchTools,
-        ...postgresTools, // Listener can query DB for context
-        ...messageLogTools,
-        ...preferenceTools
-    ];
+    const systemPrompt = `You are Fin (Listener Mode). 
+Focus: Chat, Emotional Support, Analysis, General Questions.
+Style: Empathetic, casual "bro/bestie" Indonesian (Jakarta slang). Be supportive and real.
 
-    const modelWithTools = model.bindTools(tools);
+Be conversational and helpful. If they're venting, listen and validate.
+Keep responses SHORT (2-3 sentences max).`;
 
-    const systemPrompt = `You are Fin (Listener Mode).
-    Focus: Emotional Support, Reality Decoding, General Chat.
-    Tools: Web Search, DB Query (read-only), Memory.
-    Style: Empathetic, Sarkas/Funny (if appropriate), "Bro/Bestie".
-    
-    If the user is venting, listen and validate.
-    If the user asks a question, use Search or DB.
-    NO HALLUCINATIONS. Check 'messageLogTools' if you need past context.`;
-
-    const response = await modelWithTools.invoke([
+    const response = await model.invoke([
         new SystemMessage(systemPrompt),
         ...state.messages
     ]);
 
-    return { messages: [response] };
+    console.log(`[Listener] Response generated`);
+    return { messages: [response], next: "end" };
 }
 
-
 // --- Graph Construction ---
-
 export function createFinGraph() {
     const workflow = new StateGraph(AgentState)
-        .addNode("Supervisor", supervisorNode)
-        .addNode("Organizer", organizerNode)
-        .addNode("Listener", listenerNode)
-        .addEdge(START, "Supervisor")
+        .addNode("supervisor", supervisorNode)
+        .addNode("organizer", organizerNode)
+        .addNode("listener", listenerNode)
+        .addEdge(START, "supervisor")
         .addConditionalEdges(
-            "Supervisor",
+            "supervisor",
             (state) => state.next,
             {
-                Organizer: "Organizer",
-                Listener: "Listener"
+                organizer: "organizer",
+                listener: "listener"
             }
         )
-        .addEdge("Organizer", END)
-        .addEdge("Listener", END);
+        .addEdge("organizer", END)
+        .addEdge("listener", END);
 
     return workflow;
 }
