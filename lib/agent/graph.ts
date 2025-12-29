@@ -25,21 +25,18 @@ const getModel = () => new ChatOpenAI({
 
 // --- Supervisor Node ---
 async function supervisorNode(state: typeof AgentState.State) {
-    const model = getModel();
-    const systemPrompt = `You are Fin's Supervisor. Route the user's message to the correct worker:
-- **Organizer**: scheduling, calendar, habits, tasks, reminders, "connect google", "auth"
-- **Listener**: chat, emotional support, analysis, general questions
+    // Deterministic routing based on keywords
+    const lastMessage = state.messages[state.messages.length - 1];
+    const messageText = (lastMessage.content as string).toLowerCase();
 
-Reply with ONLY "organizer" or "listener".`;
+    const organizerKeywords = ['calendar', 'kalender', 'schedule', 'jadwal', 'habit', 'kebiasaan',
+        'google', 'login', 'link', 'auth', 'connect', 'hubungkan',
+        'task', 'tugas', 'remind', 'ingatkan'];
 
-    const response = await model.invoke([
-        new SystemMessage(systemPrompt),
-        ...state.messages,
-    ]);
+    const isOrganizerTask = organizerKeywords.some(keyword => messageText.includes(keyword));
+    const next = isOrganizerTask ? "organizer" : "listener";
 
-    const content = (response.content as string).toLowerCase();
-    const next = content.includes("organizer") ? "organizer" : "listener";
-
+    console.log(`[Supervisor] Message: "${messageText.substring(0, 50)}..."`);
     console.log(`[Supervisor] Routing to: ${next}`);
     return { next };
 }
@@ -53,6 +50,7 @@ async function organizerNode(state: typeof AgentState.State, config: any) {
     const getAuthLinkTool = tool(
         async () => {
             const link = await createAuthDeepLink(whatsappId);
+            console.log(`[Tool] Generated deep link: ${link}`);
             return link;
         },
         {
@@ -72,9 +70,10 @@ Style: Polite, calm, and gentle like a professional head maid/butler. Speak in f
 Current time: ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB
 
 TOOLS AVAILABLE:
-- get_google_auth_link: Use this when user needs to connect Google Calendar
+- get_google_auth_link: Generates a Google Calendar authentication link
 
-If user asks about calendar/scheduling and hasn't connected yet, call get_google_auth_link and share the link.
+IMPORTANT: If the user asks for a "link", "login", or mentions "Google Calendar", you MUST call the get_google_auth_link tool.
+Do NOT just tell them about it - actually call the tool to generate the link.
 Address the user respectfully. Keep responses SHORT (2-3 sentences max).`;
 
     const response = await modelWithTools.invoke([
@@ -92,7 +91,9 @@ Address the user respectfully. Keep responses SHORT (2-3 sentences max).`;
             try {
                 const foundTool = tools.find(t => t.name === toolCall.name);
                 if (foundTool) {
-                    const result = await foundTool.invoke(toolCall);
+                    // Call the tool function directly with the args
+                    const result = await foundTool.func(toolCall.args || {});
+                    console.log(`[Organizer] Tool result type: ${typeof result}, value: ${result}`);
                     toolMessages.push(new ToolMessage({
                         content: String(result),
                         tool_call_id: toolCall.id!,
@@ -110,25 +111,33 @@ Address the user respectfully. Keep responses SHORT (2-3 sentences max).`;
 
         // Get final response after tool execution
         // Extract the actual link from tool messages
+        console.log(`[Organizer] Tool messages count: ${toolMessages.length}`);
+        console.log(`[Organizer] First tool message type: ${toolMessages[0]?.constructor.name}`);
+        console.log(`[Organizer] First tool message content type: ${typeof toolMessages[0]?.content}`);
+
+        console.log(`[Organizer] First tool message content:`, toolMessages[0]?.content);
+        console.log(`[Organizer] First tool message content stringified:`, JSON.stringify(toolMessages[0]?.content));
+
         const linkResults = toolMessages
             .filter(msg => msg instanceof ToolMessage)
-            .map(msg => (msg as ToolMessage).content)
+            .map(msg => {
+                const content = (msg as ToolMessage).content;
+                console.log(`[Organizer] Processing content, type: ${typeof content}, value:`, content);
+                // Handle if content is an object or string
+                return typeof content === 'string' ? content : JSON.stringify(content);
+            })
             .join('\n');
 
-        const finalSystemPrompt = `${systemPrompt}
+        console.log(`[Organizer] Extracted link (final): ${linkResults}`);
 
-IMPORTANT: You just received tool results. The authentication link is:
-${linkResults}
+        // Create a direct response with the link instead of asking LLM to format it
+        const responseText = `Silakan klik tautan berikut untuk menghubungkan Google Calendar Anda:\n\n${linkResults}\n\nTautan ini akan kedaluwarsa dalam 1 jam. Jika ada yang perlu dibantu, saya siap membantu.`;
 
-Now respond to the user with this link. DO NOT say "[object ToolMessage]". 
-Use the actual URL shown above. Format it nicely in your response.`;
+        const finalResponse = new AIMessage({
+            content: responseText
+        });
 
-        const finalResponse = await modelWithTools.invoke([
-            new SystemMessage(finalSystemPrompt),
-            ...state.messages,
-        ]);
-
-        console.log(`[Organizer] Final response generated after tool execution`);
+        console.log(`[Organizer] Final response: ${responseText.substring(0, 100)}...`);
         return { messages: [response, ...toolMessages, finalResponse], next: "end" };
     }
 
