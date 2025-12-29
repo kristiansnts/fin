@@ -3,6 +3,7 @@ import { BaseMessage, HumanMessage, SystemMessage, AIMessage, ToolMessage } from
 import { StateGraph, Annotation, START, END, MessagesAnnotation } from "@langchain/langgraph";
 import { ChatOpenAI } from "@langchain/openai";
 import { createAuthDeepLink } from "@/lib/google/oauth";
+import { isGoogleConnected } from "@/lib/google/auth-check";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 
@@ -46,7 +47,11 @@ async function organizerNode(state: typeof AgentState.State, config: any) {
     const model = getModel();
     const whatsappId = config.configurable?.thread_id?.replace('wa_', '') || 'unknown';
 
-    // Create auth link tool
+    // 1. Check Google Connection
+    const isConnected = await isGoogleConnected(whatsappId);
+    console.log(`[Organizer] User ${whatsappId} connected status: ${isConnected}`);
+
+    // 2. Define Auth Tool (Always available)
     const getAuthLinkTool = tool(
         async () => {
             const link = await createAuthDeepLink(whatsappId);
@@ -55,33 +60,75 @@ async function organizerNode(state: typeof AgentState.State, config: any) {
         },
         {
             name: "get_google_auth_link",
-            description: "Generate a Google OAuth authentication link when user needs to connect their Google Calendar. Call this if user mentions calendar, scheduling, or asks to connect Google.",
+            description: "Generates a Google Calendar authentication link. Use this if the user needs to connect/reconnect their calendar.",
             schema: z.object({}),
         }
     );
 
-    const tools = [getAuthLinkTool];
+    // 3. Prepare Tools
+    let tools: any[] = [getAuthLinkTool];
+
+    if (isConnected) {
+        try {
+            const { createCalendarTools } = await import("@/lib/google/calendar/tools");
+            const calendarTools = await createCalendarTools(whatsappId);
+            // Filter out the dummy tool matching the name in CreateCalendarTools if exists
+            const activeCalendarTools = calendarTools.filter((t: any) => t.name !== "google_calendar_not_connected");
+            tools = [...activeCalendarTools, getAuthLinkTool];
+        } catch (e) {
+            console.error("Error loading calendar tools:", e);
+        }
+    }
+
     const modelWithTools = model.bindTools(tools);
 
-    const systemPrompt = `You are Fin (Organizer Mode). 
+    // 4. Prepare Prompt based on Status
+    let systemPrompt = "";
+    if (isConnected) {
+        systemPrompt = `You are Fin (Organizer Mode). 
 Focus: Scheduling, Habits, Productivity.
 Style: Polite, calm, and gentle like a professional head maid/butler. Speak in formal Indonesian with respectful tone.
 
 Current time: ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB
 
+STATUS: ✅ Google Calendar CONNECTED.
+
+TOOLS AVAILABLE:
+- list_calendar_events: View schedule (e.g., "jadwal hari ini", "agenda besok")
+- get_upcoming_calendar_events: See next upcoming events
+- create_calendar_event: Add new events
+- quick_add_calendar_event: Quickly add events with text
+- get_google_auth_link: Re-connect if needed
+
+INSTRUCTIONS:
+- Use calendar tools to answer questions about schedule/agenda.
+- Summarize found events politely.
+- If no events found, state that politely.
+- Keep responses SHORT (2-3 sentences max) but helpful.`;
+    } else {
+        systemPrompt = `You are Fin (Organizer Mode). 
+Focus: Scheduling, Habits, Productivity.
+Style: Polite, calm, and gentle like a professional head maid/butler. Speak in formal Indonesian with respectful tone.
+
+Current time: ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB
+
+STATUS: ❌ Google Calendar NOT CONNECTED.
+
 TOOLS AVAILABLE:
 - get_google_auth_link: Generates a Google Calendar authentication link
 
-IMPORTANT: If the user asks for a "link", "login", or mentions "Google Calendar", you MUST call the get_google_auth_link tool.
+IMPORTANT: The user CANNOT use calendar features yet. 
+If they ask about "schedule", "calendar", "jadwal", or "login", you MUST call 'get_google_auth_link' to help them connect.
 Do NOT just tell them about it - actually call the tool to generate the link.
-Address the user respectfully. Keep responses SHORT (2-3 sentences max).`;
+Address the user respectfully.`;
+    }
 
     const response = await modelWithTools.invoke([
         new SystemMessage(systemPrompt),
         ...state.messages
     ]);
 
-    // Check if there are tool calls
+    // 5. Check Tool Calls
     if (response.tool_calls && response.tool_calls.length > 0) {
         console.log(`[Organizer] Tool calls detected: ${response.tool_calls.length}`);
 
@@ -91,11 +138,20 @@ Address the user respectfully. Keep responses SHORT (2-3 sentences max).`;
             try {
                 const foundTool = tools.find(t => t.name === toolCall.name);
                 if (foundTool) {
-                    // Call the tool function directly with the args
-                    const result = await foundTool.func({} as any);
-                    console.log(`[Organizer] Tool result type: ${typeof result}, value: ${result}`);
+                    let result;
+                    // Handle difference between simple tools and older LangChain tools
+                    if (foundTool.func) {
+                        result = await foundTool.func(toolCall.args || {});
+                    } else {
+                        result = await foundTool.invoke(toolCall.args || {});
+                    }
+
+                    console.log(`[Organizer] Tool result type: ${typeof result}`);
+                    // Ensure string content
+                    const contentStr = typeof result === 'string' ? result : JSON.stringify(result);
+
                     toolMessages.push(new ToolMessage({
-                        content: String(result),
+                        content: contentStr,
                         tool_call_id: toolCall.id!,
                         name: toolCall.name
                     }));
@@ -109,35 +165,25 @@ Address the user respectfully. Keep responses SHORT (2-3 sentences max).`;
             }
         }
 
-        // Get final response after tool execution
-        // Extract the actual link from tool messages
-        console.log(`[Organizer] Tool messages count: ${toolMessages.length}`);
-        console.log(`[Organizer] First tool message type: ${toolMessages[0]?.constructor.name}`);
-        console.log(`[Organizer] First tool message content type: ${typeof toolMessages[0]?.content}`);
+        // 6. Special Handling for Auth Link Response
+        const authToolMsg = toolMessages.find(m => m.name === "get_google_auth_link");
+        if (authToolMsg) {
+            const linkResult = (authToolMsg as ToolMessage).content as string;
+            console.log(`[Organizer] Extracted link (final): ${linkResult}`);
+            const responseText = `Silakan klik tautan berikut untuk menghubungkan Google Calendar Anda:\n\n${linkResult}\n\nTautan ini akan kedaluwarsa dalam 1 jam. Jika ada yang perlu dibantu, saya siap membantu.`;
+            const finalResponse = new AIMessage({ content: responseText });
+            return { messages: [response, ...toolMessages, finalResponse], next: "end" };
+        }
 
-        console.log(`[Organizer] First tool message content:`, toolMessages[0]?.content);
-        console.log(`[Organizer] First tool message content stringified:`, JSON.stringify(toolMessages[0]?.content));
+        // 7. Normal Final Response for other tools
+        const finalResponse = await modelWithTools.invoke([
+            new SystemMessage(systemPrompt),
+            ...state.messages,
+            response,
+            ...toolMessages
+        ]);
 
-        const linkResults = toolMessages
-            .filter(msg => msg instanceof ToolMessage)
-            .map(msg => {
-                const content = (msg as ToolMessage).content;
-                console.log(`[Organizer] Processing content, type: ${typeof content}, value:`, content);
-                // Handle if content is an object or string
-                return typeof content === 'string' ? content : JSON.stringify(content);
-            })
-            .join('\n');
-
-        console.log(`[Organizer] Extracted link (final): ${linkResults}`);
-
-        // Create a direct response with the link instead of asking LLM to format it
-        const responseText = `Silakan klik tautan berikut untuk menghubungkan Google Calendar Anda:\n\n${linkResults}\n\nTautan ini akan kedaluwarsa dalam 1 jam. Jika ada yang perlu dibantu, saya siap membantu.`;
-
-        const finalResponse = new AIMessage({
-            content: responseText
-        });
-
-        console.log(`[Organizer] Final response: ${responseText.substring(0, 100)}...`);
+        console.log(`[Organizer] Final response generated after tool execution`);
         return { messages: [response, ...toolMessages, finalResponse], next: "end" };
     }
 
@@ -185,4 +231,3 @@ export function createFinGraph() {
 
     return workflow;
 }
-

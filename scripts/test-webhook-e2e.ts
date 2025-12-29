@@ -12,14 +12,14 @@ async function testWebhook() {
     // ⚠️ IMPORTANT: Change 'from' to YOUR real WhatsApp number (e.g. '62812...' ) to receive the reply!
     // If you use a fake number, the Agent will run but the WAHA reply will fail (500 Error).
     // Format: CountryCodePhoneNumber@s.whatsapp.net (e.g. 62812345678@s.whatsapp.net)
-    const testPhoneNumber = "6281196960658@s.whatsapp.net";
+    const testPhoneNumber = "6283125180658@c.us";
 
     const payload = {
         session: "default",
         payload: {
             id: `test_msg_${Date.now()}`,
             from: testPhoneNumber,
-            body: "Fin, tolong kirim link login Google Calendar",
+            body: "Cek jadwal minggu ini",
             _data: { Info: { Sender: testPhoneNumber, Chat: testPhoneNumber, PushName: "TestUser" } }
         },
         timestamp: Date.now() / 1000
