@@ -72,9 +72,7 @@ async function organizerNode(state: typeof AgentState.State, config: any) {
     if (isConnected) {
         try {
             // Static import is handled at top of file now
-            console.log("[Organizer] Attempting to load calendar tools...");
             const calendarTools = await createCalendarTools(whatsappId);
-            console.log(`[Organizer] Loaded ${calendarTools.length} calendar tools.`);
 
             // Filter out the dummy tool matching the name in CreateCalendarTools if exists
             const activeCalendarTools = calendarTools.filter((t: any) => t.name !== "google_calendar_not_connected");
@@ -82,11 +80,8 @@ async function organizerNode(state: typeof AgentState.State, config: any) {
         } catch (e) {
             console.error("[Organizer] Error loading calendar tools (CRITICAL):", e);
         }
-    } else {
-        console.log("[Organizer] User not connected. Skipping calendar tools.");
     }
 
-    console.log(`[Organizer] Total tools bound: ${tools.map(t => t.name).join(", ")}`);
     const modelWithTools = model.bindTools(tools);
 
     // 4. Prepare Prompt based on Status
