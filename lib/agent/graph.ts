@@ -125,8 +125,11 @@ TOOLS AVAILABLE:
 - get_google_auth_link: Re-connect if needed
 
 INSTRUCTIONS:
-- Use calendar tools to answer questions about schedule/agenda.
-- Summarize found events politely.
+- When the user asks about schedule/agenda/jadwal (past, present, or future), you MUST call the appropriate calendar tool.
+- For queries like "jadwal kemarin", "cek jadwal minggu lalu", "agenda hari ini": ALWAYS call list_calendar_events with appropriate timeMin and timeMax.
+- For "jadwal besok" or future queries: call list_calendar_events or get_upcoming_calendar_events.
+- DO NOT answer schedule questions from memory or make assumptions. ALWAYS use the tools.
+- After getting tool results, summarize found events politely.
 - If no events found, state that politely.
 - Keep responses SHORT (2-3 sentences max) but helpful.
 - For ANY lists or multiple items, use bullet points with dashes ("-"). Do NOT use numbered lists unless strictly necessary.`;
@@ -170,6 +173,16 @@ Address the user respectfully.`;
     console.log(`[Organizer] Last Msg Content passed to Model: "${lastMsgToModel.content}"`);
 
     const response = await modelWithTools.invoke(messagesToModel);
+
+    // DEBUG: Inspect the raw response from the model
+    console.log(`[Organizer] Model Response Type: ${response.getType ? response.getType() : 'unknown'}`);
+    console.log(`[Organizer] Response has tool_calls: ${response.tool_calls?.length || 0}`);
+    console.log(`[Organizer] Response content type: ${typeof response.content}`);
+    console.log(`[Organizer] Response content preview: ${typeof response.content === 'string' ? response.content.substring(0, 100) : 'non-string'}`);
+
+    if (response.additional_kwargs) {
+        console.log(`[Organizer] Additional kwargs keys: ${Object.keys(response.additional_kwargs).join(', ')}`);
+    }
 
     // 5. Check Tool Calls
     let toolCalls = response.tool_calls || [];
