@@ -92,7 +92,7 @@ Address the user respectfully. Keep responses SHORT (2-3 sentences max).`;
                 const foundTool = tools.find(t => t.name === toolCall.name);
                 if (foundTool) {
                     // Call the tool function directly with the args
-                    const result = await foundTool.func(toolCall.args || {});
+                    const result = await foundTool.func({} as any);
                     console.log(`[Organizer] Tool result type: ${typeof result}, value: ${result}`);
                     toolMessages.push(new ToolMessage({
                         content: String(result),
