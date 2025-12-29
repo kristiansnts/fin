@@ -49,7 +49,7 @@ async function organizerNode(state: typeof AgentState.State, config: any) {
     const whatsappId = config.configurable?.thread_id?.replace('wa_', '') || 'unknown';
 
     // 1. Check Google Connection
-    const isConnected = await isGoogleConnected(whatsappId);
+    let isConnected = await isGoogleConnected(whatsappId);
     console.log(`[Organizer] User ${whatsappId} connected status: ${isConnected}`);
 
     // 2. Define Auth Tool (Always available)
@@ -68,17 +68,28 @@ async function organizerNode(state: typeof AgentState.State, config: any) {
 
     // 3. Prepare Tools
     let tools: any[] = [getAuthLinkTool];
+    let loadedToolsCount = 0;
 
     if (isConnected) {
         try {
             // Static import is handled at top of file now
+            console.log(`[Organizer] Loading tools for ${whatsappId}...`);
             const calendarTools = await createCalendarTools(whatsappId);
 
-            // Filter out the dummy tool matching the name in CreateCalendarTools if exists
+            // Filter out the dummy tool
             const activeCalendarTools = calendarTools.filter((t: any) => t.name !== "google_calendar_not_connected");
-            tools = [...activeCalendarTools, getAuthLinkTool];
+
+            if (activeCalendarTools.length > 0) {
+                tools = [...activeCalendarTools, getAuthLinkTool];
+                loadedToolsCount = activeCalendarTools.length;
+                console.log(`[Organizer] Successfully loaded ${loadedToolsCount} calendar tools: ${activeCalendarTools.map((t: any) => t.name).join(', ')}`);
+            } else {
+                console.warn("[Organizer] Connected but no active calendar tools found. Creating tools returned dummy?");
+            }
         } catch (e) {
-            console.error("[Organizer] Error loading calendar tools (CRITICAL):", e);
+            console.error("[Organizer] CRITICAL: Failed to load calendar tools:", e);
+            // Fallback: Treat as disconnected if tools fail to load to avoid hallucination
+            isConnected = false;
         }
     }
 
@@ -148,10 +159,17 @@ Do NOT just tell them about it - actually call the tool to generate the link.
 Address the user respectfully.`;
     }
 
-    const response = await modelWithTools.invoke([
+    const messagesToModel = [
         new SystemMessage(systemPrompt),
         ...state.messages.slice(-10)
-    ]);
+    ];
+
+    // DEBUG: Print the last human message being sent to model to verify it's what we expect
+    const lastMsgToModel = messagesToModel[messagesToModel.length - 1];
+    console.log(`[Organizer] Sending ${messagesToModel.length} msgs to model.`);
+    console.log(`[Organizer] Last Msg Content passed to Model: "${lastMsgToModel.content}"`);
+
+    const response = await modelWithTools.invoke(messagesToModel);
 
     // 5. Check Tool Calls
     let toolCalls = response.tool_calls || [];

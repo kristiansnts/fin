@@ -7,7 +7,7 @@ import {
     WebhookErrorResponse
 } from "./types";
 import { extractMessage, sendWhatsAppReply, markAsSeen, startTyping, stopTyping, setPresence } from "@/lib/whatsapp/message-handler";
-import { processWhatsAppWithAgent } from "../agent";
+import { processWhatsAppWithAgent } from "@/app/api/whatsapp/agent";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(req: NextRequest): Promise<NextResponse<WebhookResponse>> {
