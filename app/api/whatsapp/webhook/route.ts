@@ -8,6 +8,7 @@ import {
 } from "./types";
 import { extractMessage, sendWhatsAppReply, markAsSeen, startTyping, stopTyping, setPresence } from "@/lib/whatsapp/message-handler";
 import { processWhatsAppWithAgent } from "../agent";
+import { prisma } from "@/lib/prisma";
 
 export async function POST(req: NextRequest): Promise<NextResponse<WebhookResponse>> {
     try {
@@ -40,6 +41,34 @@ export async function POST(req: NextRequest): Promise<NextResponse<WebhookRespon
             });
         }
 
+        // --- DEDUPLICATION ---
+        // Try to reserve this message ID in the database.
+        // If it already exists (UniqueConstraintViolation), we skip it.
+        try {
+            await prisma.messageLog.create({
+                data: {
+                    id: message.id, // WAHA message ID
+                    message: message.text,
+                    response: "PROCESSING", // Initial state
+                    createdAt: new Date(),
+                    // We don't have a guaranteed User ID here unless we query it. 
+                    // Leaving userId null is allowed by schema (String?).
+                }
+            });
+        } catch (error: any) {
+            if (error.code === 'P2002') {
+                console.log(`♻️ Skipping duplicate message ID: ${message.id}`);
+                return NextResponse.json({
+                    success: true,
+                    skipped: true,
+                    reason: "Duplicate message ID"
+                });
+            }
+            // If other error, log but maybe continue or throw?
+            // Safer to continue if DB is just acting up, but better to log.
+            console.error("Deduplication check failed:", error);
+        }
+
         console.log(`📩 Message from ${message.from} on session ${message.session}: ${message.text}`);
 
         const session = message.session || 'default';
@@ -63,9 +92,21 @@ export async function POST(req: NextRequest): Promise<NextResponse<WebhookRespon
         // 6. Set presence online
         await setPresence("online", undefined, session);
 
+        // Update the log with the response
+        // We do this asynchronously to not block the webhook response time too much
+        // although we are already at the end.
+        try {
+            await prisma.messageLog.update({
+                where: { id: message.id },
+                data: { response: String(agentResponse) }
+            });
+        } catch (updateError) {
+            console.error("Failed to update message log with response:", updateError);
+        }
+
         const response: WebhookSuccessResponse = {
             success: true,
-            message: "Message received and queued for processing",
+            message: "Message received and processed",
             data: {
                 from: message.from,
                 messageReceived: message.text,

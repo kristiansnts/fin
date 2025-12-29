@@ -2,6 +2,7 @@ import { getWahaClient } from "@/lib/waha/waha-client";
 import { WahaWebhookPayload } from "@/app/api/whatsapp/webhook/types";
 
 export interface ProcessedMessage {
+    id: string;
     from: string;
     text: string;
     session: string;
@@ -14,6 +15,7 @@ export interface ProcessedMessage {
 export function extractMessage(payload: WahaWebhookPayload): ProcessedMessage | null {
     const whatsappId = payload.payload?.from;
     const messageText = payload.payload?.body;
+    const messageId = payload.payload?.id || payload.sender?.id || `msg_${Date.now()}`; // Fallback if no ID
     const session = payload.session || "default";
 
     if (!whatsappId || !messageText) {
@@ -21,6 +23,7 @@ export function extractMessage(payload: WahaWebhookPayload): ProcessedMessage | 
     }
 
     return {
+        id: messageId,
         from: whatsappId,
         text: messageText,
         session,

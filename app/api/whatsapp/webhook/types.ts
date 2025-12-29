@@ -9,6 +9,7 @@ export interface WahaWebhookPayload {
     session?: string;
     // Standard WAHA
     payload?: {
+        id?: string;
         body: string;
         from: string;
         _data?: {
