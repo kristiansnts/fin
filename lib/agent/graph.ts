@@ -4,6 +4,7 @@ import { StateGraph, Annotation, START, END, MessagesAnnotation } from "@langcha
 import { ChatOpenAI } from "@langchain/openai";
 import { createAuthDeepLink } from "@/lib/google/oauth";
 import { isGoogleConnected } from "@/lib/google/auth-check";
+import { createCalendarTools } from "@/lib/google/calendar/tools";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 
@@ -70,7 +71,7 @@ async function organizerNode(state: typeof AgentState.State, config: any) {
 
     if (isConnected) {
         try {
-            const { createCalendarTools } = await import("@/lib/google/calendar/tools");
+            // Static import is handled at top of file now
             const calendarTools = await createCalendarTools(whatsappId);
             // Filter out the dummy tool matching the name in CreateCalendarTools if exists
             const activeCalendarTools = calendarTools.filter((t: any) => t.name !== "google_calendar_not_connected");
