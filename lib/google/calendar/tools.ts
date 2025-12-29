@@ -114,5 +114,161 @@ export async function createCalendarTools(whatsappId: string) {
         }
     );
 
-    return [listEventsTool, getUpcomingEventsTool, createEventTool, quickAddTool];
+    const deleteEventTool = tool(
+        async ({ eventId }) => {
+            try {
+                await service.deleteEvent(eventId);
+                return `Event deleted successfully.`;
+            } catch (error: any) {
+                return `Error deleting event: ${error.message}`;
+            }
+        },
+        {
+            name: "delete_calendar_event",
+            description: "Delete a calendar event by its ID.",
+            schema: z.object({
+                eventId: z.string().describe("The ID of the event to delete"),
+            }),
+        }
+    );
+
+    const updateEventTool = tool(
+        async (options) => {
+            try {
+                const event = await service.updateEvent({
+                    eventId: options.eventId,
+                    summary: options.summary,
+                    description: options.description,
+                    location: options.location,
+                    startTime: options.startTime,
+                    endTime: options.endTime,
+                    attendees: options.attendees,
+                });
+                return `Event updated successfully: ${event.htmlLink}`;
+            } catch (error: any) {
+                return `Error updating event: ${error.message}`;
+            }
+        },
+        {
+            name: "update_calendar_event",
+            description: "Update an existing calendar event. Provide the event ID and the fields you want to change.",
+            schema: z.object({
+                eventId: z.string().describe("The ID of the event to update"),
+                summary: z.string().optional().describe("The new title of the event"),
+                description: z.string().optional().describe("The new description of the event"),
+                location: z.string().optional().describe("The new location of the event"),
+                startTime: z.string().optional().describe("ISO string for new start time"),
+                endTime: z.string().optional().describe("ISO string for new end time"),
+                attendees: z.array(z.string()).optional().describe("List of attendee emails"),
+            }),
+        }
+    );
+
+    const bulkCreateEventsTool = tool(
+        async ({ events }) => {
+            try {
+                const results = [];
+                for (const eventData of events) {
+                    const event = await service.createEvent({
+                        summary: eventData.summary,
+                        description: eventData.description,
+                        location: eventData.location,
+                        startTime: eventData.startTime,
+                        endTime: eventData.endTime,
+                        attendees: eventData.attendees,
+                    });
+                    results.push({ success: true, summary: eventData.summary, link: event.htmlLink });
+                }
+                return `Successfully created ${results.length} events:\n${results.map(r => `- ${r.summary}: ${r.link}`).join('\n')}`;
+            } catch (error: any) {
+                return `Error in bulk create: ${error.message}`;
+            }
+        },
+        {
+            name: "bulk_create_calendar_events",
+            description: "Create multiple calendar events at once. Useful for batch scheduling.",
+            schema: z.object({
+                events: z.array(z.object({
+                    summary: z.string().describe("The title of the event"),
+                    description: z.string().optional().describe("The description of the event"),
+                    location: z.string().optional().describe("The location of the event"),
+                    startTime: z.string().describe("ISO string for start time"),
+                    endTime: z.string().describe("ISO string for end time"),
+                    attendees: z.array(z.string()).optional().describe("List of attendee emails"),
+                })).describe("Array of events to create"),
+            }),
+        }
+    );
+
+    const bulkUpdateEventsTool = tool(
+        async ({ updates }) => {
+            try {
+                const results = [];
+                for (const updateData of updates) {
+                    const event = await service.updateEvent({
+                        eventId: updateData.eventId,
+                        summary: updateData.summary,
+                        description: updateData.description,
+                        location: updateData.location,
+                        startTime: updateData.startTime,
+                        endTime: updateData.endTime,
+                        attendees: updateData.attendees,
+                    });
+                    results.push({ success: true, eventId: updateData.eventId, link: event.htmlLink });
+                }
+                return `Successfully updated ${results.length} events.`;
+            } catch (error: any) {
+                return `Error in bulk update: ${error.message}`;
+            }
+        },
+        {
+            name: "bulk_update_calendar_events",
+            description: "Update multiple calendar events at once. Provide array of event IDs with their updates.",
+            schema: z.object({
+                updates: z.array(z.object({
+                    eventId: z.string().describe("The ID of the event to update"),
+                    summary: z.string().optional().describe("The new title of the event"),
+                    description: z.string().optional().describe("The new description of the event"),
+                    location: z.string().optional().describe("The new location of the event"),
+                    startTime: z.string().optional().describe("ISO string for new start time"),
+                    endTime: z.string().optional().describe("ISO string for new end time"),
+                    attendees: z.array(z.string()).optional().describe("List of attendee emails"),
+                })).describe("Array of event updates"),
+            }),
+        }
+    );
+
+    const bulkDeleteEventsTool = tool(
+        async ({ eventIds }) => {
+            try {
+                const results = [];
+                for (const eventId of eventIds) {
+                    await service.deleteEvent(eventId);
+                    results.push({ success: true, eventId });
+                }
+                return `Successfully deleted ${results.length} events.`;
+            } catch (error: any) {
+                return `Error in bulk delete: ${error.message}`;
+            }
+        },
+        {
+            name: "bulk_delete_calendar_events",
+            description: "Delete multiple calendar events at once. Provide array of event IDs.",
+            schema: z.object({
+                eventIds: z.array(z.string()).describe("Array of event IDs to delete"),
+            }),
+        }
+    );
+
+    return [
+        listEventsTool,
+        getUpcomingEventsTool,
+        createEventTool,
+        quickAddTool,
+        deleteEventTool,
+        updateEventTool,
+        bulkCreateEventsTool,
+        bulkUpdateEventsTool,
+        bulkDeleteEventsTool
+    ];
 }
