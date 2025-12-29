@@ -150,7 +150,7 @@ Address the user respectfully.`;
 
     const response = await modelWithTools.invoke([
         new SystemMessage(systemPrompt),
-        ...state.messages
+        ...state.messages.slice(-10)
     ]);
 
     // 5. Check Tool Calls
@@ -237,7 +237,7 @@ Address the user respectfully.`;
         // 7. Normal Final Response for other tools
         const finalResponse = await modelWithTools.invoke([
             new SystemMessage(systemPrompt),
-            ...state.messages,
+            ...state.messages.slice(-10),
             response,
             ...toolMessages
         ]);
@@ -276,7 +276,7 @@ Focus: Chat, Emotional Support, Analysis, General Questions.
 
     const response = await model.invoke([
         new SystemMessage(systemPrompt),
-        ...state.messages
+        ...state.messages.slice(-10)
     ]);
 
     console.log(`[Listener] Response generated`);
