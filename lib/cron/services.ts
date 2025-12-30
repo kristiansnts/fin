@@ -31,7 +31,7 @@ export async function runMorningBriefing() {
             let conflicts = 0;
 
             if (busyCount === 0) {
-                scheduleAnalysis = "Jadwal kosong hari ini. Enjoy the silence.";
+                scheduleAnalysis = "Agenda Tuan hari ini kosong. Momen yang tepat untuk perencanaan strategis atau istirahat yang berkualitas.";
             } else {
                 for (let i = 0; i < events.length - 1; i++) {
                     const currentEnd = events[i].end?.dateTime ? new Date(events[i].end!.dateTime as string).getTime() : 0;
@@ -40,10 +40,10 @@ export async function runMorningBriefing() {
                 }
 
                 if (conflicts > 0) {
-                    scheduleAnalysis = `⚠️ Warning: Ada ${conflicts} overlap di jadwal hari ini. Cek kalender sekarang daripada panik nanti.\n\n`;
+                    scheduleAnalysis = `⚠️ Perhatian: Terdeteksi ${conflicts} konflik jadwal. Saya sarankan Tuan meninjau ulang alokasi waktu untuk efisiensi maksimal.\n\n`;
                 }
 
-                scheduleAnalysis += `Agenda utama (${busyCount} total):`;
+                scheduleAnalysis += `Agenda Prioritas (${busyCount} total):`;
                 events.slice(0, 5).forEach(evt => {
                     const start = evt.start;
                     const time = (start && start.dateTime)
@@ -51,15 +51,15 @@ export async function runMorningBriefing() {
                         : 'All Day';
                     scheduleAnalysis += `\n- ${time}: ${evt.summary}`;
                 });
-                if (busyCount > 5) scheduleAnalysis += `\n...dan ${busyCount - 5} lainnya.`;
+                if (busyCount > 5) scheduleAnalysis += `\n...dan ${busyCount - 5} agenda lainnya.`;
             }
 
             let habitNudge = "";
             if (pendingHabits.length > 0) {
-                habitNudge = `\n\n🎯 Target: ${pendingHabits.length} habits pending.`;
+                habitNudge = `\n\n🎯 Target: ${pendingHabits.length} kebiasaan menunggu penyelesaian.`;
             }
 
-            const intro = `Yo. Briefing pagi buat ${new Date().toLocaleDateString('id-ID', { weekday: 'long' })}.`;
+            const intro = `Selamat pagi, Tuan. Berikut adalah analisis penjadwalan Tuan untuk ${new Date().toLocaleDateString('id-ID', { weekday: 'long' })}.`;
             const message = `${intro}\n\n${scheduleAnalysis}${habitNudge}`;
 
             await sendWhatsAppReply(user.whatsappId, message);
@@ -196,28 +196,28 @@ export async function runEveningSummary() {
             }
 
             if (completedHabits.length === 0 && eventsCount === 0) {
-                const message = `Hari udah mau abis bro. Istirahat yang cukup ya. 😴\n\nBesok kita hajar lagi. Good night!`;
+                const message = `Hari operasional telah berakhir, Tuan. Istirahat yang cukup adalah investasi vital untuk produktivitas esok hari. Selamat beristirahat.`;
                 await sendWhatsAppReply(user.whatsappId, message);
                 results.push({ userId: user.id, status: 'sent', type: 'empty' });
                 continue;
             }
 
-            let summary = `🌙 Daily Closure\n\n`;
+            let summary = `🌙 Laporan Penutup Harian\n\n`;
             if (eventsCount > 0) {
-                summary += `Hari ini lu udah lewatin ${eventsCount} agenda. `;
-                summary += (eventsCount > 5) ? "Gila sih, busy banget." : "Not bad.";
+                summary += `Tuan telah menyelesaikan ${eventsCount} agenda hari ini. `;
+                summary += (eventsCount > 5) ? "Tingkat aktivitas yang sangat tinggi." : "Hari yang produktif.";
                 summary += "\n";
             }
 
             if (completedHabits.length > 0) {
-                summary += `\n✅ Habits Done:\n`;
+                summary += `\n✅ Kebiasaan Terselesaikan:\n`;
                 completedHabits.forEach(h => summary += `- ${h.title}\n`);
-                summary += `\nNice progress on these!`;
+                summary += `\nAkumulasi kemajuan yang sangat baik.`;
             } else {
-                summary += `\n(No habits logged today. Its okay, besok coba nyicil satu ya.)`;
+                summary += `\n(Belum ada data kebiasaan yang tercatat hari ini. Konsistensi adalah kunci aset jangka panjang, Tuan.)`;
             }
 
-            const message = `${summary}\n\nSekarang waktunya disconnect. Sampai ketemu besok pagi! 👋`;
+            const message = `${summary}\n\nSaatnya untuk beristirahat agar performa Tuan kembali optimal esok hari. Selamat malam.`;
 
             await sendWhatsAppReply(user.whatsappId, message);
 
