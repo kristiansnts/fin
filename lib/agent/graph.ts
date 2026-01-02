@@ -27,18 +27,44 @@ const getModel = () => new ChatOpenAI({
 
 // --- Supervisor Node ---
 async function supervisorNode(state: typeof AgentState.State) {
-    // Deterministic routing based on keywords
+    // Deterministic routing based on keywords and patterns
     const lastMessage = state.messages[state.messages.length - 1];
     const messageText = (lastMessage.content as string).toLowerCase();
 
-    const organizerKeywords = ['calendar', 'kalender', 'schedule', 'jadwal', 'habit', 'kebiasaan',
+    // Core organizer keywords
+    const organizerKeywords = [
+        'calendar', 'kalender', 'schedule', 'jadwal', 'habit', 'kebiasaan',
         'google', 'login', 'link', 'auth', 'connect', 'hubungkan',
-        'task', 'tugas', 'remind', 'ingatkan', 'meet', 'meeting', 'absen', 'rapat', 'agenda'];
+        'task', 'tugas', 'remind', 'ingatkan', 'meet', 'meeting', 'absen', 'rapat', 'agenda',
+        // Date-related keywords
+        'tgl', 'tanggal', 'date', 'hari', 'besok', 'lusa', 'kemarin',
+        'senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu', 'minggu',
+        'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+        'januari', 'februari', 'maret', 'april', 'mei', 'juni',
+        'juli', 'agustus', 'september', 'oktober', 'november', 'desember',
+        // Time-related keywords
+        'jam', 'pagi', 'siang', 'sore', 'malam', 'pukul', 'waktu',
+        // Travel/activity keywords that often need scheduling
+        'jalan', 'pergi', 'berangkat', 'pulang', 'trip', 'travel', 'kunjung', 'visit',
+        'acara', 'event', 'kegiatan', 'appointment'
+    ];
 
-    const isOrganizerTask = organizerKeywords.some(keyword => messageText.includes(keyword));
+    // Date pattern detection (e.g., "13 januari", "tgl 13", "tanggal 5")
+    const datePatterns = [
+        /\btgl\s*\d+/,           // tgl 13, tgl13
+        /\btanggal\s*\d+/,       // tanggal 13
+        /\b\d{1,2}\s+(jan|feb|mar|apr|mei|jun|jul|agu|sep|okt|nov|des)/,  // 13 januari
+        /\b\d{1,2}[\/\-]\d{1,2}/, // 13/1, 13-1
+    ];
+
+    const hasDatePattern = datePatterns.some(pattern => pattern.test(messageText));
+    const hasOrganizerKeyword = organizerKeywords.some(keyword => messageText.includes(keyword));
+
+    const isOrganizerTask = hasOrganizerKeyword || hasDatePattern;
     const next = isOrganizerTask ? "organizer" : "listener";
 
     console.log(`[Supervisor] Message: "${messageText.substring(0, 50)}..."`);
+    console.log(`[Supervisor] Has keyword: ${hasOrganizerKeyword}, Has date pattern: ${hasDatePattern}`);
     console.log(`[Supervisor] Routing to: ${next}`);
     return { next };
 }
