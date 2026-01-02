@@ -33,7 +33,7 @@ async function supervisorNode(state: typeof AgentState.State) {
 
     const organizerKeywords = ['calendar', 'kalender', 'schedule', 'jadwal', 'habit', 'kebiasaan',
         'google', 'login', 'link', 'auth', 'connect', 'hubungkan',
-        'task', 'tugas', 'remind', 'ingatkan'];
+        'task', 'tugas', 'remind', 'ingatkan', 'meet', 'meeting', 'absen', 'rapat', 'agenda'];
 
     const isOrganizerTask = organizerKeywords.some(keyword => messageText.includes(keyword));
     const next = isOrganizerTask ? "organizer" : "listener";
@@ -142,6 +142,7 @@ INSTRUCTIONS:
   * Use bulk_delete_calendar_events for deleting multiple events
 - DO NOT answer schedule questions from memory or make assumptions. ALWAYS use the tools.
 - After getting tool results, summarize found events politely.
+- ALWAYS include the Google Calendar link for each event created or listed.
 - If no events found, state that politely.
 - Keep responses SHORT (2-3 sentences max) but helpful.
 - For ANY lists or multiple items, use bullet points with dashes ("-"). Do NOT use numbered lists unless strictly necessary.`;
@@ -213,8 +214,16 @@ Address the user respectfully.`;
             let match;
             while ((match = paramRegex.exec(content)) !== null) {
                 const paramName = match[1];
-                const paramValue = match[2].trim();
-                args[paramName] = paramValue;
+                const raw = match[2].trim();
+                // Attempt to JSON-parse parameter values (needed for bulk tools)
+                let parsed: any = raw;
+                try {
+                    const startsLikeJson = raw.startsWith('{') || raw.startsWith('[') || raw.startsWith('"');
+                    parsed = startsLikeJson ? JSON.parse(raw) : raw;
+                } catch {
+                    parsed = raw;
+                }
+                args[paramName] = parsed;
             }
 
             // Construct manual tool call
