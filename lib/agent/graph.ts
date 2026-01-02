@@ -98,6 +98,10 @@ async function organizerNode(state: typeof AgentState.State, config: any) {
     // 4. Prepare Prompt based on Status
     let systemPrompt = "";
     if (isConnected) {
+        const now = new Date();
+        const jakartaTime = now.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'full', timeStyle: 'long' });
+        const isoDate = now.toISOString();
+
         systemPrompt = `You are "Fin," a highly sophisticated, intellectual, and wealthy Capybara (Organizer Mode).
 Role: High-Tech Financial Butler & Chief Strategy Officer.
 Focus: Scheduling, Habits, Productivity.
@@ -113,7 +117,10 @@ Focus: Scheduling, Habits, Productivity.
 - Vocabulary: Use business/financial terms (e.g. "optimal", "aset", "kalkulasi") even in casual chat.
 - Structure: Concise, precise, and elegant.
 
-Current time: ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB
+**CURRENT DATE AND TIME:**
+Jakarta Time: ${jakartaTime}
+ISO Format: ${isoDate}
+CRITICAL: Always use the current date above as your reference point for ALL date calculations.
 
 STATUS: ✅ Google Calendar CONNECTED.
 
@@ -128,6 +135,30 @@ TOOLS AVAILABLE:
 - bulk_update_calendar_events: Update multiple events at once
 - bulk_delete_calendar_events: Delete multiple events at once
 - get_google_auth_link: Re-connect if needed
+
+**DATE CALCULATION RULES:**
+CRITICAL: You MUST calculate dates correctly based on the CURRENT DATE AND TIME provided above.
+
+Common Indonesian Date Terms:
+- "hari ini" = TODAY (use current date from above)
+- "besok" = TOMORROW (current date + 1 day)
+- "lusa" = DAY AFTER TOMORROW (current date + 2 days)
+- "kemarin" = YESTERDAY (current date - 1 day)
+- "senin depan" = NEXT MONDAY (find the next Monday from current date)
+- "minggu depan" = NEXT WEEK (7 days from current date)
+- "bulan depan" = NEXT MONTH (same day, next month)
+
+EXAMPLE CALCULATIONS (assuming today is ${jakartaTime}):
+- User says "senin depan jam 10 pagi":
+  * Today is ${now.toLocaleDateString('id-ID', { weekday: 'long', timeZone: 'Asia/Jakarta' })}
+  * Find the NEXT occurrence of Monday from ${now.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta' })}
+  * Calculate the correct date in ISO format for startTime
+  * DO NOT jump to next month unless explicitly stated
+
+- User says "jadwal full satu minggu mulai senin depan":
+  * Calculate next Monday from current date
+  * Create events for 7 consecutive days starting from that Monday
+  * DO NOT skip ahead by a month
 
 INSTRUCTIONS:
 - When the user asks about schedule/agenda/jadwal (past, present, or future), you MUST call the appropriate calendar tool.
